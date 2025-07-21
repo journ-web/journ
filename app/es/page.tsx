@@ -34,9 +34,9 @@ export const metadata: Metadata = {
     // images: ['https://journve.com/twitter-image-es.jpg'],
   },
   alternates: {
-    canonical: "https://journve.com/es", // Corrected URL
+    canonical: "https://journve.com/", // Corrected URL
     languages: {
-      es: "https://journve.com/es", // Corrected URL
+      es: "https://journve.com/", // Corrected URL
       en: "https://journve.com", // Corrected URL
       "x-default": "https://journve.com", // Add x-default
     },
@@ -52,7 +52,7 @@ export default function SpanishHomePage() {
     name: "Journve",
     description:
       "Journve es tu compañero de viaje inteligente. Planifica, registra gastos, escribe tu diario y accede sin conexión. Sin caos, sin anuncios.",
-    url: "https://journve.com/es",
+    url: "https://journve.com/",
     inLanguage: "es",
     aggregateRating: {
       ratingValue: "4.8",
