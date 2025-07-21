@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidString(field, minLength, maxLength) {
+      return field is string && field.size() >= minLength && field.size() <= maxLength;
+    }
+    
+    function isValidOptionalString(field, minLength, maxLength) {
+      return field == null || (field is string && field.size() >= minLength && field.size() <= maxLength);
+    }
+    
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+    
+    // Helper function to check if user is authorized blog manager
+    function isBlogManager() {
+      return isAuthenticated() && (
+        request.auth.uid == 'wm4sGMxPlYh1ChK8CypasjX03s62' ||
+        request.auth.uid == 'GLrrDHR66MXFXOfe3KSWszINGzL2'
+      );
+    }
+    
+    // User data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Journal entries - Fixed permissions and validation
+      match /journal/{entryId} {
+        allow read: if isOwner(userId);
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.keys().hasAll(['title', 'content', 'date', 'mood'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 500
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 10000
+          && request.resource.data.date is string
+          && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.mood is string
+          && request.resource.data.mood in ['happy', 'sad', 'excited', 'relaxed', 'adventurous', 'nostalgic', 'grateful', 'neutral']
+          // Updated rules to allow null for optional string fields
+          && (!request.resource.data.keys().hasAny(['tripId']) || request.resource.data.tripId is string || request.resource.data.tripId == null)
+          && (!request.resource.data.keys().hasAny(['weather']) || request.resource.data.weather is string || request.resource.data.weather == null)
+          && (!request.resource.data.keys().hasAny(['location']) || request.resource.data.location is string || request.resource.data.location == null)
+          && (!request.resource.data.keys().hasAny(['tags']) || (request.resource.data.tags is list && request.resource.data.tags.size() <= 20))
+          && (!request.resource.data.keys().hasAny(['photos']) || (request.resource.data.photos is list && request.resource.data.photos.size() <= 10));
+        
+        allow update: if request.auth != null && request.auth.uid == userId
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']))
+          // Updated rules to allow null for optional string fields during update
+          && (request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 500)
+          && (request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 10000)
+          && (request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+          && (request.resource.data.mood is string && request.resource.data.mood in ['happy', 'sad', 'excited', 'relaxed', 'adventurous', 'nostalgic', 'grateful', 'neutral'])
+          && (!request.resource.data.keys().hasAny(['tripId']) || request.resource.data.tripId is string || request.resource.data.tripId == null)
+          && (!request.resource.data.keys().hasAny(['weather']) || request.resource.data.weather is string || request.resource.data.weather == null)
+          && (!request.resource.data.keys().hasAny(['location']) || request.resource.data.location is string || request.resource.data.location == null)
+          && (!request.resource.data.keys().hasAny(['tags']) || (request.resource.data.tags is list && request.resource.data.tags.size() <= 20))
+          && (!request.resource.data.keys().hasAny(['photos']) || (request.resource.data.photos is list && request.resource.data.photos.size() <= 10));
+        allow delete: if isOwner(userId);
+      }
+      
+      // Trips
+      match /trips/{tripId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Tasks within trips
+        match /tasks/{taskId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+        
+        // Expenses within trips
+        match /expenses/{expenseId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+      
+      // Todo tasks
+      match /todos/{todoId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Notifications
+      match /notifications/{notificationId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Splitly groups
+      match /splitlyGroups/{groupId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Expenses subcollection
+        match /expenses/{expenseId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+        
+        // Settlements subcollection
+        match /settlements/{settlementId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+      
+      // Blogs subcollection
+      match /blogs/{blogId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Public blog posts
+    match /publicBlogs/{blogId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Top-level blogs collection (restricted to specific blog managers)
+    match /blogs/{blogId} {
+      allow read: if true; // Allow public read access for published blogs
+      allow write: if isBlogManager(); // Only allow specific users to manage blogs
+    }
+    
+    // Public exchange rates
+    match /exchangeRates/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Public settings
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}
